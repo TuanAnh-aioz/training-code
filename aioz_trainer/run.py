@@ -64,6 +64,7 @@ def run(input_obj: Union[dict, TrainerInput] = None) -> TrainerOutput:
             logger.info(f"Resumed from epoch {start_epoch}, best_score={best_score:.4f}")
 
         for epoch in range(start_epoch, config["epochs"]):
+            logger.info(f"Epoch [{epoch+1}/{config['epochs']}]")
             train_loss = train_one_epoch(model, train_loader, optimizer, criterion, device, config["task_type"])
             metrics = validate(model, val_loader, device, config["task_type"])
             score = list(metrics.values())[0]

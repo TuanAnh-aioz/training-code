@@ -7,7 +7,7 @@ from torch import nn
 logger = logging.getLogger(__name__)
 
 
-def build_detector(model_name: str, num_classes: int, pretrained: bool = True):
+def build_detector(model_name: str, num_classes: int, pretrained: str):
     """
     Build any object detection model from torchvision with automatic head replacement.
 
@@ -33,7 +33,7 @@ def build_detector(model_name: str, num_classes: int, pretrained: bool = True):
     model_fn = getattr(torchvision.models.detection, model_name)
 
     if pretrained:
-        model = model_fn(weights=None)
+        model = model_fn(weights=None, weights_backbone=None)
 
         # Load pretrained state dict
         state_dict = torch.load(pretrained, map_location="cpu")
@@ -45,7 +45,7 @@ def build_detector(model_name: str, num_classes: int, pretrained: bool = True):
         logger.warning(f"Using default torchvision pretrained weights for {model_name}")
     else:
         logger.warning(f"Initializing '{model_name}' from scratch")
-        model = model_fn(weights=None)
+        model = model_fn(weights=None, weights_backbone=None)
 
     # Automatic head replacement
     model = _replace_detection_head(model, num_classes)

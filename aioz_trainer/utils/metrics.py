@@ -108,7 +108,7 @@ def get_scheduler(optimizer, config, num_epochs=None, steps_per_epoch=None):
     scheduler_params = sched_cfg.get("params", {})
     schedulers = {
         "steplr": torch.optim.lr_scheduler.StepLR,
-        "multi_steplr": torch.optim.lr_scheduler.MultiStepLR,
+        "multisteplr": torch.optim.lr_scheduler.MultiStepLR,
         "exponential": torch.optim.lr_scheduler.ExponentialLR,
         "cosine": torch.optim.lr_scheduler.CosineAnnealingLR,
         "cosine_annealing": torch.optim.lr_scheduler.CosineAnnealingLR,

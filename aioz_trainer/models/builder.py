@@ -1,7 +1,5 @@
 import logging
 
-import torch
-
 from .classifier import build_classifier
 from .detector import build_detector
 
@@ -27,7 +25,6 @@ def build_model(task_type, config, device):
     model_name = config["name"]
     num_classes = config.get("num_classes", 1000)
     pretrained = config.get("pretrained", "")
-    weights_path = config.get("weights_path", None)
 
     # ---- Build model ----
     if task_type == "classification":
@@ -36,12 +33,6 @@ def build_model(task_type, config, device):
         model = build_detector(model_name, num_classes, pretrained=pretrained)
     else:
         raise ValueError(f"Unsupported task type: {task_type}")
-
-    # ---- Load custom weights if specified ----
-    if weights_path is not None:
-        logger.info(f"Loading custom weights from: {weights_path}")
-        state_dict = torch.load(weights_path, map_location=device)
-        model.load_state_dict(state_dict, strict=False)
 
     # ---- Move to device ----
     model = model.to(device)

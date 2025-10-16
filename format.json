@@ -2,8 +2,7 @@
     "task_type": "xxx",
     "model": {
         "name": "xxx",
-        "pretrained": true,
-        "weights_path" : "", 
+        "pretrained": "",
         "num_classes": 2,
         "resume": ""
     },
