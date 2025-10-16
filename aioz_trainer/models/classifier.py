@@ -1,9 +1,13 @@
+import logging
+
 import torch
 import torch.nn as nn
 import torchvision.models as models
 
+logger = logging.getLogger(__name__)
 
-def build_classifier(model_name: str, num_classes: int, pretrained: bool = True):
+
+def build_classifier(model_name: str, num_classes: int, pretrained: str):
     """
     Build any classification model from torchvision with dynamic head replacement.
 
@@ -17,23 +21,29 @@ def build_classifier(model_name: str, num_classes: int, pretrained: bool = True)
     """
     # Check if the model exists in torchvision.models
     if not hasattr(models, model_name):
-        raise ValueError(f"Model '{model_name}' not found in torchvision.models.\n" f"Available models: {', '.join(sorted(models.list_models()))}")
+        raise ValueError(f"Model '{model_name}' not found in torchvision.models.\n Available models: {', '.join(sorted(models.list_models()))}")
 
     # Get constructor
     model_fn = getattr(models, model_name)
 
-    # Get default weights if pretrained=True
-    weights = "DEFAULT" if pretrained else None
+    if pretrained:
+        model = model_fn(weights=None)
 
-    # Creat model
-    try:
-        model = model_fn(weights=weights)
-    except TypeError:
-        # Some older models still use 'pretrained=True' instead of 'weights'
-        model = model_fn(pretrained=pretrained)
+        # Load pretrained state dict
+        state_dict = torch.load(pretrained, map_location="cpu")
+        missing, unexpected = model.load_state_dict(state_dict, strict=False)
+        if missing:
+            logger.warning(f"Missing keys: {missing}")
+        if unexpected:
+            logger.warning(f"Unexpected keys: {unexpected}")
+        logger.warning(f"Using default torchvision pretrained weights for {model_name}")
+    else:
+        logger.warning(f"Initializing '{model_name}' from scratch")
+        model = model_fn(weights=None)
 
     # ---- Find and replace the last classification layer ----
     model = _replace_classification_head(model, num_classes)
+
     return model
 
 

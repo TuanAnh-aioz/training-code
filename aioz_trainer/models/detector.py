@@ -1,6 +1,10 @@
+import logging
+
 import torch
 import torchvision
 from torch import nn
+
+logger = logging.getLogger(__name__)
 
 
 def build_detector(model_name: str, num_classes: int, pretrained: bool = True):
@@ -28,13 +32,20 @@ def build_detector(model_name: str, num_classes: int, pretrained: bool = True):
     # Get function constructor
     model_fn = getattr(torchvision.models.detection, model_name)
 
-    # Create model
-    try:
-        weights = "DEFAULT" if pretrained else None
-        model = model_fn(weights=weights)
-    except TypeError:
-        # Some older versions still use pretrained=True
-        model = model_fn(pretrained=pretrained)
+    if pretrained:
+        model = model_fn(weights=None)
+
+        # Load pretrained state dict
+        state_dict = torch.load(pretrained, map_location="cpu")
+        missing, unexpected = model.load_state_dict(state_dict, strict=False)
+        if missing:
+            logger.warning(f"Missing keys: {missing}")
+        if unexpected:
+            logger.warning(f"Unexpected keys: {unexpected}")
+        logger.warning(f"Using default torchvision pretrained weights for {model_name}")
+    else:
+        logger.warning(f"Initializing '{model_name}' from scratch")
+        model = model_fn(weights=None)
 
     # Automatic head replacement
     model = _replace_detection_head(model, num_classes)

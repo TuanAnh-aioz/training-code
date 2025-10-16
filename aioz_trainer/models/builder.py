@@ -26,7 +26,7 @@ def build_model(task_type, config, device):
     """
     model_name = config["name"]
     num_classes = config.get("num_classes", 1000)
-    pretrained = config.get("pretrained", True)
+    pretrained = config.get("pretrained", "")
     weights_path = config.get("weights_path", None)
 
     # ---- Build model ----
