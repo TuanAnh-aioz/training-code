@@ -14,9 +14,8 @@ logger = logging.getLogger(__name__)
 
 
 class ClassificationDataset(Dataset):
-    def __init__(self, csv_path, img_size=224):
+    def __init__(self, csv_path):
         self.df = pd.read_csv(csv_path)
-        self.img_size = img_size
 
         self.classes = sorted(self.df["label"].unique())
         self.class_to_idx = {c: i for i, c in enumerate(self.classes)}
@@ -41,7 +40,7 @@ class ClassificationDataset(Dataset):
 
 
 class DetectionDataset(Dataset):
-    def __init__(self, csv_path, img_size=640):
+    def __init__(self, csv_path):
         self.df = pd.read_csv(csv_path)
 
         required_cols = {"image_path", "label", "xmin", "ymin", "xmax", "ymax"}
@@ -55,7 +54,6 @@ class DetectionDataset(Dataset):
         self.class_to_idx = {c: i + 1 for i, c in enumerate(self.classes)}
         self.class_to_idx["__background__"] = 0
 
-        self.img_size = img_size
         self.transform = None
 
     def __len__(self):
@@ -99,24 +97,23 @@ def collate_fn(batch):
 
 
 def get_dataloader(config, seed=42):
-    csv_file = config["data"]["csv_file"]
+    csv_file = config["dataset"]["csv_file"]
     task_type = config["task_type"].lower()
-    img_size = config["data"].get("img_size", 224)
-    batch_size = config["data"].get("batch_size", 4)
-    num_workers = config["data"].get("num_workers", 4)
+    batch_size = config["dataset"].get("batch_size", 4)
+    num_workers = config["dataset"].get("num_workers", 4)
     val_ratio = config.get("val_ratio", 0.3)
 
     torch.manual_seed(seed)
     random.seed(seed)
 
-    train_transform = get_transforms(config, task_type=config["task_type"], mode="train")
-    val_transform = get_transforms(config, task_type=config["task_type"], mode="val")
+    train_transform = get_transforms(config["dataset"], task_type=config["task_type"], mode="train")
+    val_transform = get_transforms(config["dataset"], task_type=config["task_type"], mode="val")
 
     if not os.path.exists(csv_file):
         raise FileNotFoundError(f"CSV file not found: {csv_file}")
 
     if task_type == "classification":
-        dataset = ClassificationDataset(csv_file, img_size=img_size)
+        dataset = ClassificationDataset(csv_file)
         dataset.transform = train_transform
 
         # Stratified split
@@ -130,7 +127,7 @@ def get_dataloader(config, seed=42):
         val_len = len(val_dataset)
 
     elif task_type == "detection":
-        dataset = DetectionDataset(csv_file, img_size=img_size)
+        dataset = DetectionDataset(csv_file)
         dataset.transform = train_transform
         total_len = len(dataset)
         val_len = int(total_len * val_ratio)

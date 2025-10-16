@@ -1,5 +1,4 @@
 import torch
-from tqdm import tqdm
 
 from .metrics import compute_metrics
 
@@ -22,11 +21,11 @@ def train_one_epoch(model, dataloader, optimizer, criterion, device, task_type="
     model.train()
     total_loss = 0.0
 
-    for imgs, targets in tqdm(dataloader, desc="Training"):
+    for imgs, targets in dataloader:
         imgs, targets = move_to_device(imgs, targets, device, task_type)
 
         optimizer.zero_grad()
-        
+
         if task_type == "classification":
             outputs = model(imgs)
             loss = criterion(outputs, targets)
@@ -48,7 +47,7 @@ def validate(model, dataloader, device, task_type="classification"):
     all_outputs, all_targets = [], []
 
     with torch.no_grad():
-        for batch in tqdm(dataloader, desc="Validating"):
+        for batch in dataloader:
             if task_type == "classification":
                 imgs, targets = batch
                 imgs = imgs.to(device)
@@ -70,6 +69,7 @@ def validate(model, dataloader, device, task_type="classification"):
                 outputs = model(imgs)
                 all_outputs.extend(outputs)
                 all_targets.extend(targets)
+
             else:
                 raise ValueError(f"Unsupported task_type: {task_type}")
 

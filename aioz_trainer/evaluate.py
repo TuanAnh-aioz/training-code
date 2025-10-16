@@ -29,11 +29,11 @@ def evaluate(config_path, weight_path):
 
     # Tính metrics
     metrics = validate(model, val_loader, device, config["task_type"])
-    print(f"Evaluation: {metrics}")
+    logger.info(f"Evaluation: {metrics}")
 
     task_type = config["task_type"].lower()
     if task_type == "detection":
-        for imgs, targets in val_loader:
+        for imgs, _ in val_loader:
             imgs = [img.to(device) for img in imgs]
             outputs = model(imgs)
 

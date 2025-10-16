@@ -208,6 +208,6 @@ __marimo__/
 
 
 *.csv
-*.json
+configs/*
 *.pt
 anodetrain/*

@@ -3,7 +3,6 @@ import logging
 import os
 import sys
 import traceback
-from enum import Enum
 
 import aioz_ainode_adapter
 import GPUtil
@@ -22,6 +21,7 @@ parser.add_argument("--tmp_dir", type=str, default=None, help="temporary directo
 parser.add_argument("--json_ip", type=str, default=None, help="path to input json file")
 parser.add_argument("--estimate_resource", action="store_true", help="Return estimate resource in output")
 args, unknown_args = parser.parse_known_args()
+
 
 def get_resource() -> dict:
     resource = {"sys_ram": {"total": 0, "usage": 0}, "gpu_memory": {"total": 0, "usage": 0}}

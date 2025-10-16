@@ -1,7 +1,6 @@
 import logging
 
 import torch
-import torch.optim as optim
 from sklearn.metrics import accuracy_score
 from torchmetrics.detection.mean_ap import MeanAveragePrecision
 from torchvision import transforms
@@ -26,53 +25,60 @@ def compute_metrics(outputs, targets, task_type):
         raise ValueError("Unsupported task")
 
 
-def get_optimizer(model, config):
+def get_optimizer(model, config, param_groups=None):
     """
     Create optimizer from config JSON.
 
     Expected config format:
-    {
-      "optimizer": {
-        "name": "Adam" | "AdamW" | "SGD" | "RMSprop" | ...,
-        "lr": 0.001,
-        "momentum": 0.9,
-        "weight_decay": 1e-4,
-        "betas": [0.9, 0.999]
-      }
-    }
+        {
+            "optimizer": {
+                "name": "Adam" | "AdamW" | "SGD" | "RMSprop" | ...,
+                "lr": 0.001,
+                params: {
+                    "momentum": 0.9,
+                    "weight_decay": 1e-4,
+                    "betas": [0.9, 0.999]
+                }
+            }
+        }
     """
     opt_cfg = config.get("optimizer", {})
-    name = opt_cfg.get("type", "Adam").lower()
-    lr = opt_cfg.get("lr", 1e-3)
-    weight_decay = opt_cfg.get("weight_decay", 0.0)
-    momentum = opt_cfg.get("momentum", 0.9)
-    betas = tuple(opt_cfg.get("betas", (0.9, 0.999)))
+    optimizer_name = opt_cfg.get("type", "Adam").lower()
+    lr_initial = opt_cfg.get("lr", 1e-3)
+    optimizer_params = opt_cfg.get("params", {})
 
-    params = model.parameters()
-
-    if name == "adam":
-        optimizer = optim.Adam(params, lr=lr, betas=betas, weight_decay=weight_decay)
-
-    elif name == "adamw":
-        optimizer = optim.AdamW(params, lr=lr, betas=betas, weight_decay=weight_decay)
-
-    elif name == "sgd":
-        optimizer = optim.SGD(params, lr=lr, momentum=momentum, weight_decay=weight_decay)
-
-    elif name == "rmsprop":
-        optimizer = optim.RMSprop(params, lr=lr, momentum=momentum, weight_decay=weight_decay)
-
-    elif name == "adagrad":
-        optimizer = optim.Adagrad(params, lr=lr, weight_decay=weight_decay)
-
+    if param_groups is not None:
+        params = param_groups
     else:
-        raise ValueError(f"Unsupported optimizer type: {name}")
+        params = [p for p in model.parameters() if p.requires_grad]
 
-    print(f"Using optimizer: {name.upper()}")
+    # Optimizer mapping
+    optimizers = {
+        "adam": torch.optim.Adam,
+        "adamw": torch.optim.AdamW,
+        "sgd": torch.optim.SGD,
+        "rmsprop": torch.optim.RMSprop,
+        "adagrad": torch.optim.Adagrad,
+        "adadelta": torch.optim.Adadelta,
+        "adamax": torch.optim.Adamax,
+        "lion": torch.optim.Lion if hasattr(torch.optim, "Lion") else None,  # PyTorch ≥ 2.1
+    }
+
+    if optimizer_name not in optimizers or optimizers[optimizer_name] is None:
+        raise NotImplementedError(f"Optimizer '{optimizer_name}' is not implemented or not available in this PyTorch version.")
+
+    # Merge lr into optimizer_params
+    if "lr" not in optimizer_params:
+        optimizer_params["lr"] = lr_initial
+
+    optimizer_class = optimizers[optimizer_name]
+    optimizer = optimizer_class(params, **optimizer_params)
+
+    logger.info(f"Using optimizer: {optimizer_name.upper()} with params: {optimizer_params}")
     return optimizer
 
 
-def get_scheduler(optimizer, config, steps_per_epoch=None):
+def get_scheduler(optimizer, config, num_epochs=None, steps_per_epoch=None):
     """
     Build learning rate scheduler from JSON config.
 
@@ -86,57 +92,60 @@ def get_scheduler(optimizer, config, steps_per_epoch=None):
     Example JSON:
       "scheduler": {
         "name": "CosineAnnealingLR",
-        "T_max": 10,
-        "eta_min": 1e-6
+        "params": {
+            "T_max": 10,
+            "eta_min": 1e-6
+        }
       }
     """
     sched_cfg = config.get("scheduler", {})
     if not sched_cfg or "type" not in sched_cfg:
-        print("No scheduler specified.")
+        logger.warning("No scheduler specified.")
         return None
 
-    name = sched_cfg["type"].lower()
-    print(f"Using scheduler: {name}")
+    scheduler_name = sched_cfg["type"].lower()
+    scheduler_params = sched_cfg.get("params", {})
+    schedulers = {
+        "steplr": torch.optim.lr_scheduler.StepLR,
+        "multi_steplr": torch.optim.lr_scheduler.MultiStepLR,
+        "exponential": torch.optim.lr_scheduler.ExponentialLR,
+        "cosine": torch.optim.lr_scheduler.CosineAnnealingLR,
+        "cosine_annealing": torch.optim.lr_scheduler.CosineAnnealingLR,
+        "cosine_restarts": torch.optim.lr_scheduler.CosineAnnealingWarmRestarts,
+        "plateau": torch.optim.lr_scheduler.ReduceLROnPlateau,
+        "onecycle": torch.optim.lr_scheduler.OneCycleLR,
+        "linear": torch.optim.lr_scheduler.LinearLR,
+        "polynomial": torch.optim.lr_scheduler.PolynomialLR if hasattr(torch.optim.lr_scheduler, "PolynomialLR") else None,
+    }
 
-    if name == "steplr":
-        return optim.lr_scheduler.StepLR(optimizer, step_size=sched_cfg.get("step_size", 10), gamma=sched_cfg.get("gamma", 0.1))
+    if scheduler_name not in schedulers or schedulers[scheduler_name] is None:
+        raise NotImplementedError(f"Scheduler '{scheduler_name}' is not implemented or not available in this PyTorch version.")
 
-    elif name == "multisteplr":
-        return optim.lr_scheduler.MultiStepLR(optimizer, milestones=sched_cfg.get("milestones", [30, 60, 90]), gamma=sched_cfg.get("gamma", 0.1))
+    # Special handling for some schedulers
+    if scheduler_name in ["onecycle"]:
+        # For OneCycleLR, you must provide total_steps or epochs * steps_per_epoch
+        if num_epochs is None or steps_per_epoch is None:
+            raise ValueError("For OneCycleLR, you must provide num_epochs and num_steps_per_epoch.")
 
-    elif name == "cosineannealinglr":
-        return optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=sched_cfg.get("T_max", 10), eta_min=sched_cfg.get("eta_min", 1e-6))
-
-    elif name == "reducelronplateau":
-        return optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer,
-            mode=sched_cfg.get("mode", "max"),
-            factor=sched_cfg.get("factor", 0.1),
-            patience=sched_cfg.get("patience", 5),
-            min_lr=sched_cfg.get("min_lr", 1e-7),
-        )
-
-    elif name == "onecyclelr":
-        # cần steps_per_epoch và total_epochs trong config
-        total_epochs = config.get("epochs", 10)
-        if steps_per_epoch is None:
-            raise ValueError("steps_per_epoch required for OneCycleLR.")
-        max_lr = sched_cfg.get("max_lr", 0.001)
-        return optim.lr_scheduler.OneCycleLR(optimizer, max_lr=max_lr, steps_per_epoch=steps_per_epoch, epochs=total_epochs)
-
+        total_steps = num_epochs * steps_per_epoch
+        scheduler_params.setdefault("total_steps", total_steps)
+        scheduler_params.setdefault("max_lr", [pg["lr"] for pg in optimizer.param_groups])
+        scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, **scheduler_params)
     else:
-        raise ValueError(f"Unsupported scheduler type: {name}")
+        scheduler_class = schedulers[scheduler_name]
+        scheduler = scheduler_class(optimizer, **scheduler_params)
+
+    logger.info(f"Using LR scheduler: {scheduler_name.upper()} with params: {scheduler_params}")
+    return scheduler
 
 
 def get_transforms(config, task_type="classification", mode="train"):
     t_cfg = config["transforms"].get(mode, {})
     t_list = []
 
-    # Resize ảnh
     if "resize" in t_cfg:
         t_list.append(transforms.Resize((t_cfg["resize"], t_cfg["resize"])))
 
-    # Chỉ train mới augment
     if mode == "train":
         if t_cfg.get("horizontal_flip", False):
             t_list.append(transforms.RandomHorizontalFlip())
@@ -151,8 +160,6 @@ def get_transforms(config, task_type="classification", mode="train"):
             t_list.append(transforms.RandomResizedCrop(t_cfg["random_crop"]))
 
     t_list.append(transforms.ToTensor())
-
-    # Normalize
     if "normalize" in t_cfg:
         mean = t_cfg["normalize"].get("mean", [0.485, 0.456, 0.406])
         std = t_cfg["normalize"].get("std", [0.229, 0.224, 0.225])
