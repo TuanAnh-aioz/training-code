@@ -43,15 +43,31 @@ def run(input_obj: Union[dict, TrainerInput] = None) -> TrainerOutput:
         optimizer = get_optimizer(model, config)
         scheduler = get_scheduler(optimizer, config, num_epochs=config["epochs"], steps_per_epoch=len(train_loader))
 
-        best_weight_path = f"{checkpoint_dir}/best.pt"
+        best_weight_path = os.path.join(checkpoint_dir, "best.pt")
         os.makedirs(checkpoint_dir, exist_ok=True)
 
+        start_epoch = 0
         best_score = 0.0
-        for epoch in range(config["epochs"]):
+        resume = config["model"]["resume"]
+        if resume:
+            checkpoint = torch.load(resume, map_location=device)
+            model.load_state_dict(checkpoint["model_state_dict"])
+            if "optimizer_state_dict" in checkpoint:
+                optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+
+            if "scheduler_state_dict" in checkpoint and scheduler is not None:
+                scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
+
+            start_epoch = checkpoint.get("epoch", 0) + 1
+            best_score = checkpoint.get("best_score", 0.0)
+
+            logger.info(f"Resumed from epoch {start_epoch}, best_score={best_score:.4f}")
+
+        for epoch in range(start_epoch, config["epochs"]):
             train_loss = train_one_epoch(model, train_loader, optimizer, criterion, device, config["task_type"])
             metrics = validate(model, val_loader, device, config["task_type"])
-
             score = list(metrics.values())[0]
+
             if scheduler is not None:
                 if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
                     scheduler.step(score)
@@ -64,7 +80,19 @@ def run(input_obj: Union[dict, TrainerInput] = None) -> TrainerOutput:
                 best_score = score
                 torch.save(model.state_dict(), best_weight_path)
 
-        output_obj = TrainerOutput(weights=best_weight_path, metrix=best_score, examples=[])
+            checkpoint_path = os.path.join(checkpoint_dir, "last.pt")
+            torch.save(
+                {
+                    "epoch": epoch,
+                    "model_state_dict": model.state_dict(),
+                    "optimizer_state_dict": optimizer.state_dict(),
+                    "scheduler_state_dict": scheduler.state_dict() if scheduler else None,
+                    "best_score": best_score,
+                },
+                checkpoint_path,
+            )
+
+        output_obj = TrainerOutput(weights=best_weight_path, metric=best_score, examples=[])
         return output_obj
 
     except Exception:
