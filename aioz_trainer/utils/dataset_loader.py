@@ -8,7 +8,7 @@ from PIL import Image
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, Dataset, Subset
 
-from utils.metrics import get_transforms
+from .metrics import get_transforms
 
 logger = logging.getLogger(__name__)
 

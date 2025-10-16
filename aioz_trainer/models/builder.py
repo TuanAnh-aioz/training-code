@@ -1,4 +1,6 @@
 import torch
+from .classifier import build_classifier
+from .detector import build_detector
 
 
 def build_model(config):
@@ -26,12 +28,10 @@ def build_model(config):
 
     # ---- Build model ----
     if task == "classification":
-        from models.classifier import build_classifier
 
         model = build_classifier(model_name, num_classes, pretrained=pretrained)
 
     elif task == "detection":
-        from models.detector import build_detector
 
         model = build_detector(model_name, num_classes, pretrained=pretrained)
 

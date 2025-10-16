@@ -6,9 +6,9 @@ import torch
 from PIL import ImageDraw
 from torchvision import transforms
 
-from models.builder import build_model
-from utils.dataset_loader import get_dataloader
-from utils.trainer import validate
+from .models.builder import build_model
+from .utils.dataset_loader import get_dataloader
+from .utils.trainer import validate
 
 logger = logging.getLogger(__name__)
 

@@ -1,7 +1,7 @@
 import torch
 from tqdm import tqdm
 
-from utils.metrics import compute_metrics
+from .metrics import compute_metrics
 
 
 def move_to_device(imgs, targets, device, task_type):
@@ -26,10 +26,12 @@ def train_one_epoch(model, dataloader, optimizer, criterion, device, task_type="
         imgs, targets = move_to_device(imgs, targets, device, task_type)
 
         optimizer.zero_grad()
-        outputs = model(imgs, targets)
+        
         if task_type == "classification":
+            outputs = model(imgs)
             loss = criterion(outputs, targets)
         elif task_type == "detection":
+            outputs = model(imgs, targets)
             loss = sum(loss for loss in outputs.values())
 
         loss.backward()
@@ -66,7 +68,6 @@ def validate(model, dataloader, device, task_type="classification"):
                     t["image_id"] = t["image_id"].to(device)
 
                 outputs = model(imgs)
-                # print(f"targets: {targets}, outputs: {outputs}")
                 all_outputs.extend(outputs)
                 all_targets.extend(targets)
             else:
