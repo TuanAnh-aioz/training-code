@@ -7,11 +7,10 @@ from typing import Union
 import torch
 from aioz_ainode_base.trainer.exception import AINodeTrainerException
 from aioz_ainode_base.trainer.schemas import TrainerInput, TrainerOutput
-from torch import nn
 
 from .models.builder import build_model
 from .utils.dataset_loader import get_dataloader
-from .utils.metrics import get_optimizer, get_scheduler
+from .utils.metrics import get_criterion, get_optimizer, get_scheduler
 from .utils.trainer import train_one_epoch, validate
 
 logger = logging.getLogger(__name__)
@@ -28,27 +27,30 @@ def run(input_obj: Union[dict, TrainerInput] = None) -> TrainerOutput:
         # Write code here
         if isinstance(input_obj, dict):
             input_obj = TrainerInput.model_validate(input_obj)
+
         checkpoint_dir = input_obj.checkpoint_directory
         # output_dir = input_obj.output_directory
 
         config = load_config(input_obj.config)
+        task_type = config["task_type"]
 
         device = "cuda" if torch.cuda.is_available() else "cpu"
-        model = build_model(config).to(device)
+        model = build_model(task_type, config["model"], device)
 
-        train_loader, val_loader = get_dataloader(config)
+        train_loader, val_loader = get_dataloader(task_type, config["dataset"])
 
-        criterion = nn.CrossEntropyLoss() if config["task_type"] == "classification" else None
+        criterion = get_criterion(task_type, config)
         optimizer = get_optimizer(model, config)
         scheduler = get_scheduler(optimizer, config, num_epochs=config["epochs"], steps_per_epoch=len(train_loader))
 
-        best_score = 0
         best_weight_path = f"{checkpoint_dir}/best.pt"
         os.makedirs(checkpoint_dir, exist_ok=True)
 
+        best_score = 0.0
         for epoch in range(config["epochs"]):
             train_loss = train_one_epoch(model, train_loader, optimizer, criterion, device, config["task_type"])
             metrics = validate(model, val_loader, device, config["task_type"])
+
             score = list(metrics.values())[0]
             if scheduler is not None:
                 if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):

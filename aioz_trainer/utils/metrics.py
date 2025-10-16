@@ -1,6 +1,7 @@
 import logging
 
 import torch
+import torch.nn as nn
 from sklearn.metrics import accuracy_score
 from torchmetrics.detection.mean_ap import MeanAveragePrecision
 from torchvision import transforms
@@ -149,6 +150,7 @@ def get_transforms(config, task_type="classification", mode="train"):
     if mode == "train":
         if t_cfg.get("horizontal_flip", False):
             t_list.append(transforms.RandomHorizontalFlip())
+
         if "color_jitter" in t_cfg and task_type == "classification":
             cj = t_cfg["color_jitter"]
             t_list.append(
@@ -156,6 +158,7 @@ def get_transforms(config, task_type="classification", mode="train"):
                     brightness=cj.get("brightness", 0), contrast=cj.get("contrast", 0), saturation=cj.get("saturation", 0), hue=cj.get("hue", 0)
                 )
             )
+
         if "random_crop" in t_cfg and task_type == "classification":
             t_list.append(transforms.RandomResizedCrop(t_cfg["random_crop"]))
 
@@ -166,3 +169,54 @@ def get_transforms(config, task_type="classification", mode="train"):
         t_list.append(transforms.Normalize(mean=mean, std=std))
 
     return transforms.Compose(t_list)
+
+
+def get_criterion(task_type, config):
+    """
+    Returns the appropriate loss function according to task_type.
+
+    Configuration example:
+    {
+        "task_type": "classification",
+        "loss": {
+            "type": "CrossEntropyLoss",
+            "params": {
+                "weight": null,
+                "label_smoothing": 0.1
+            }
+        }
+    }
+    """
+    loss_cfg = config.get("loss", {})
+    loss_type = loss_cfg.get("type", None)
+    loss_params = loss_cfg.get("params", {})
+
+    # --- Classification ---
+    if task_type == "classification":
+        if not loss_type:
+            loss_type = "CrossEntropyLoss"
+
+        if loss_type.lower() == "crossentropyloss":
+            return nn.CrossEntropyLoss(**loss_params)
+        elif loss_type.lower() == "bceloss":
+            return nn.BCELoss(**loss_params)
+        elif loss_type.lower() == "bcewithlogitsloss":
+            return nn.BCEWithLogitsLoss(**loss_params)
+        elif loss_type.lower() == "mse":
+            return nn.MSELoss(**loss_params)
+        else:
+            raise ValueError(f"Unsupported classification loss: {loss_type}")
+
+    # --- Detection ---
+    elif task_type == "detection":
+        # Detection models (FasterRCNN, RetinaNet, etc.)
+        return None
+
+    # --- Segmentation ---
+    elif task_type == "segmentation":
+        if not loss_type:
+            loss_type = "CrossEntropyLoss"
+        return getattr(nn, loss_type)(**loss_params)
+
+    else:
+        raise ValueError(f"Unsupported task_type: {task_type}")

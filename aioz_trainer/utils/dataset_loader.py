@@ -45,7 +45,7 @@ class DetectionDataset(Dataset):
 
         required_cols = {"image_path", "label", "xmin", "ymin", "xmax", "ymax"}
         if not required_cols.issubset(self.df.columns):
-            raise ValueError(f"CSV detection cần có cột: {required_cols}")
+            raise ValueError(f"CSV detection requires columns: {required_cols}")
 
         self.image_groups = self.df.groupby("image_path")
         self.image_paths = list(self.image_groups.groups.keys())
@@ -96,18 +96,17 @@ def collate_fn(batch):
     return tuple(zip(*batch))
 
 
-def get_dataloader(config, seed=42):
-    csv_file = config["dataset"]["csv_file"]
-    task_type = config["task_type"].lower()
-    batch_size = config["dataset"].get("batch_size", 4)
-    num_workers = config["dataset"].get("num_workers", 4)
+def get_dataloader(task_type, config, seed=42):
+    csv_file = config["csv_file"]
+    batch_size = config.get("batch_size", 4)
+    num_workers = config.get("num_workers", 4)
     val_ratio = config.get("val_ratio", 0.3)
 
     torch.manual_seed(seed)
     random.seed(seed)
 
-    train_transform = get_transforms(config["dataset"], task_type=config["task_type"], mode="train")
-    val_transform = get_transforms(config["dataset"], task_type=config["task_type"], mode="val")
+    train_transform = get_transforms(config, task_type=task_type, mode="train")
+    val_transform = get_transforms(config, task_type=task_type, mode="val")
 
     if not os.path.exists(csv_file):
         raise FileNotFoundError(f"CSV file not found: {csv_file}")
@@ -121,6 +120,7 @@ def get_dataloader(config, seed=42):
         train_dataset = Subset(dataset, train_idx)
         val_dataset = Subset(dataset, val_idx)
         val_dataset.dataset.transform = val_transform
+
         collate = None
         total_len = len(dataset)
         train_len = len(train_dataset)
@@ -129,9 +129,11 @@ def get_dataloader(config, seed=42):
     elif task_type == "detection":
         dataset = DetectionDataset(csv_file)
         dataset.transform = train_transform
+
         total_len = len(dataset)
         val_len = int(total_len * val_ratio)
         train_len = total_len - val_len
+
         train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_len, val_len], generator=torch.Generator().manual_seed(seed))
         val_dataset.dataset.transform = val_transform
         collate = collate_fn
@@ -140,7 +142,6 @@ def get_dataloader(config, seed=42):
         raise ValueError(f"Unsupported task type: {task_type}")
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers, collate_fn=collate, pin_memory=True)
-
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers, collate_fn=collate, pin_memory=True)
 
     logger.info(f"Dataset loaded: {total_len} samples ({train_len} train / {val_len} val)")

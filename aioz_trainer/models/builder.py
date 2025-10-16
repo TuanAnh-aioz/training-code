@@ -8,7 +8,7 @@ from .detector import build_detector
 logger = logging.getLogger(__name__)
 
 
-def build_model(config):
+def build_model(task_type, config, device):
     """
     Build a model (classification or detection) based on the given config.
 
@@ -24,20 +24,18 @@ def build_model(config):
         - device: "cpu" | "cuda" (optional)
         - weights_path: optional path to load custom weights
     """
-    task = config["task_type"].lower()
-    model_name = config["model_name"]
+    model_name = config["name"]
     num_classes = config.get("num_classes", 1000)
     pretrained = config.get("pretrained", True)
-    device = config.get("device", "cuda" if torch.cuda.is_available() else "cpu")
     weights_path = config.get("weights_path", None)
 
     # ---- Build model ----
-    if task == "classification":
+    if task_type == "classification":
         model = build_classifier(model_name, num_classes, pretrained=pretrained)
-    elif task == "detection":
+    elif task_type == "detection":
         model = build_detector(model_name, num_classes, pretrained=pretrained)
     else:
-        raise ValueError(f"Unsupported task type: {task}")
+        raise ValueError(f"Unsupported task type: {task_type}")
 
     # ---- Load custom weights if specified ----
     if weights_path is not None:
