@@ -36,7 +36,7 @@ class ClassificationDataset(Dataset):
             img = self.transform(img)
 
         label = torch.tensor(self.class_to_idx[row["label"]], dtype=torch.long)
-        return img, label
+        return img, label, image_path
 
 
 class DetectionDataset(Dataset):
@@ -89,7 +89,7 @@ class DetectionDataset(Dataset):
             "labels": torch.tensor(labels, dtype=torch.int64),
             "image_id": torch.tensor([idx]),
         }
-        return img, target
+        return img, target, img_path
 
 
 def collate_fn(batch):
@@ -145,4 +145,4 @@ def get_dataloader(task_type, config, seed=42):
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers, collate_fn=collate, pin_memory=True)
 
     logger.info(f"Dataset loaded: {total_len} samples ({train_len} train / {val_len} val)")
-    return train_loader, val_loader
+    return train_loader, val_loader, dataset

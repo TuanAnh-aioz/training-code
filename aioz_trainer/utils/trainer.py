@@ -21,7 +21,7 @@ def train_one_epoch(model, dataloader, optimizer, criterion, device, task_type="
     model.train()
     total_loss = 0.0
 
-    for imgs, targets in dataloader:
+    for imgs, targets, _ in dataloader:
         imgs, targets = move_to_device(imgs, targets, device, task_type)
 
         optimizer.zero_grad()
@@ -48,8 +48,8 @@ def validate(model, dataloader, device, task_type="classification"):
 
     with torch.no_grad():
         for batch in dataloader:
+            imgs, targets, _ = batch
             if task_type == "classification":
-                imgs, targets = batch
                 imgs = imgs.to(device)
                 targets = targets.to(device)
 
@@ -58,7 +58,6 @@ def validate(model, dataloader, device, task_type="classification"):
                 all_targets.append(targets)
 
             elif task_type == "detection":
-                imgs, targets = batch
                 imgs = [img.to(device) for img in imgs]
 
                 for t in targets:

@@ -11,3 +11,6 @@ git+https://github.com/AIOZNetwork/w3ai-node-base.git
 git+https://github.com/AIOZNetwork/w3ai-node-public.git
 GPUtil==1.4.0
 psutil==5.9.5
+matplotlib==3.8.2
+opencv-contrib-python==4.8.1.78
+opencv-python-headless==4.8.1.78

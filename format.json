@@ -51,6 +51,6 @@
             "label_smoothing": 0.1
         }
     },
-    "log_interval": 20
-   
+    "log_interval": 20,
+    "threshold": 0.75
 }
