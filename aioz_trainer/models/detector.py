@@ -95,6 +95,6 @@ if __name__ == "__main__":
             model.eval()
             dummy = [torch.randn(3, 3, 224, 224)]
             out = model(dummy)
-            print(f"✅ {name}: OK, output length = {len(out)}")
+            print(f"{name}: OK, output length = {len(out)}")
         except Exception as e:
-            print(f"❌ {name}: {e}")
+            print(f"{name}: {e}")

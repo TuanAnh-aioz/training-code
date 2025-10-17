@@ -1,12 +1,13 @@
 import logging
 
+from ..enums import Tasks
 from .classifier import build_classifier
 from .detector import build_detector
 
 logger = logging.getLogger(__name__)
 
 
-def build_model(task_type, config, device):
+def build_model(task_type: str, config: dict, device: str):
     """
     Build a model (classification or detection) based on the given config.
 
@@ -27,9 +28,9 @@ def build_model(task_type, config, device):
     pretrained = config.get("pretrained", "")
 
     # ---- Build model ----
-    if task_type == "classification":
+    if task_type == Tasks.CLASSIFICATION.value:
         model = build_classifier(model_name, num_classes, pretrained=pretrained)
-    elif task_type == "detection":
+    elif task_type == Tasks.DETECTION.value:
         model = build_detector(model_name, num_classes, pretrained=pretrained)
     else:
         raise ValueError(f"Unsupported task type: {task_type}")

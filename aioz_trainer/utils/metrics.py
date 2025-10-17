@@ -1,22 +1,26 @@
 import logging
+from typing import Any, Dict, List, Optional
 
 import torch
 import torch.nn as nn
 from sklearn.metrics import accuracy_score
+from torch.optim.lr_scheduler import _LRScheduler
 from torchmetrics.detection.mean_ap import MeanAveragePrecision
 from torchvision import transforms
+
+from ..enums import Tasks
 
 logger = logging.getLogger(__name__)
 
 
-def compute_metrics(outputs, targets, task_type):
-    if task_type == "classification":
+def compute_metrics(outputs: List[torch.Tensor], targets: List[torch.Tensor], task_type: str) -> Dict[str, float]:
+    if task_type == Tasks.CLASSIFICATION.value:
         preds = torch.cat(outputs).argmax(dim=1).cpu().numpy()
         labels = torch.cat(targets).cpu().numpy()
         acc = accuracy_score(labels, preds)
         return {"accuracy": acc}
 
-    elif task_type == "detection":
+    elif task_type == Tasks.DETECTION.value:
         metric = MeanAveragePrecision(iou_type="bbox")
         metric.update(outputs, targets)
         result = metric.compute()
@@ -26,7 +30,7 @@ def compute_metrics(outputs, targets, task_type):
         raise ValueError("Unsupported task")
 
 
-def get_optimizer(model, config, param_groups=None):
+def get_optimizer(model: torch.nn.Module, config: Dict[str, Any], param_groups: Optional[List[Dict[str, Any]]] = None) -> torch.optim.Optimizer:
     """
     Create optimizer from config JSON.
 
@@ -79,7 +83,9 @@ def get_optimizer(model, config, param_groups=None):
     return optimizer
 
 
-def get_scheduler(optimizer, config, num_epochs=None, steps_per_epoch=None):
+def get_scheduler(
+    optimizer: torch.optim.Optimizer, config: dict, num_epochs: Optional[int] = None, steps_per_epoch: Optional[int] = None
+) -> Optional[_LRScheduler]:
     """
     Build learning rate scheduler from JSON config.
 
@@ -140,7 +146,7 @@ def get_scheduler(optimizer, config, num_epochs=None, steps_per_epoch=None):
     return scheduler
 
 
-def get_transforms(config, task_type="classification", mode="train"):
+def get_transforms(config: dict, task_type: str, mode: str):
     t_cfg = config["transforms"].get(mode, {})
     t_list = []
 
@@ -151,7 +157,7 @@ def get_transforms(config, task_type="classification", mode="train"):
         if t_cfg.get("horizontal_flip", False):
             t_list.append(transforms.RandomHorizontalFlip())
 
-        if "color_jitter" in t_cfg and task_type == "classification":
+        if "color_jitter" in t_cfg and task_type == Tasks.CLASSIFICATION.value:
             cj = t_cfg["color_jitter"]
             t_list.append(
                 transforms.ColorJitter(
@@ -159,7 +165,7 @@ def get_transforms(config, task_type="classification", mode="train"):
                 )
             )
 
-        if "random_crop" in t_cfg and task_type == "classification":
+        if "random_crop" in t_cfg and task_type == Tasks.CLASSIFICATION.value:
             t_list.append(transforms.RandomResizedCrop(t_cfg["random_crop"]))
 
     t_list.append(transforms.ToTensor())
@@ -171,7 +177,7 @@ def get_transforms(config, task_type="classification", mode="train"):
     return transforms.Compose(t_list)
 
 
-def get_criterion(task_type, config):
+def get_criterion(task_type: str, config: dict):
     """
     Returns the appropriate loss function according to task_type.
 
@@ -192,7 +198,7 @@ def get_criterion(task_type, config):
     loss_params = loss_cfg.get("params", {})
 
     # --- Classification ---
-    if task_type == "classification":
+    if task_type == Tasks.CLASSIFICATION.value:
         if not loss_type:
             loss_type = "CrossEntropyLoss"
 
@@ -208,12 +214,12 @@ def get_criterion(task_type, config):
             raise ValueError(f"Unsupported classification loss: {loss_type}")
 
     # --- Detection ---
-    elif task_type == "detection":
+    elif task_type == Tasks.DETECTION.value:
         # Detection models (FasterRCNN, RetinaNet, etc.)
         return None
 
     # --- Segmentation ---
-    elif task_type == "segmentation":
+    elif task_type == Tasks.SEGMENTATION.value:
         if not loss_type:
             loss_type = "CrossEntropyLoss"
         return getattr(nn, loss_type)(**loss_params)

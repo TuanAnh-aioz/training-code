@@ -1,8 +1,11 @@
+from typing import Tuple
+
 import cv2
+import numpy as np
 from matplotlib import cm
 
 
-def get_label_colors(class_to_idx):
+def get_label_colors(class_to_idx: dict):
     idx_to_class = {v: k for k, v in class_to_idx.items()}
     num_classes = len(idx_to_class)
 
@@ -21,7 +24,7 @@ def get_label_colors(class_to_idx):
     return colors
 
 
-def draw_transparent_box(img, pt1, pt2, color, alpha=0.3):
+def draw_transparent_box(img: np.ndarray, pt1: Tuple[int, int], pt2: Tuple[int, int], color: Tuple[int, int, int], alpha: float = 0.3):
     if not (0 <= alpha <= 1):
         raise ValueError("Alpha must be between 0 and 1.")
     if img is None or img.ndim != 3:
@@ -32,7 +35,7 @@ def draw_transparent_box(img, pt1, pt2, color, alpha=0.3):
     cv2.addWeighted(overlay, alpha, img, 1 - alpha, 0, img)
 
 
-def draw_label(img, text, pos, color, font_scale=0.5, thickness=1):
+def draw_label(img: np.ndarray, text: str, pos: Tuple[int, int], color: Tuple[int, int, int], font_scale: float = 0.5, thickness: int = 1):
     font = cv2.FONT_HERSHEY_SIMPLEX
     x, y = pos
     (tw, th), baseline = cv2.getTextSize(text, font, font_scale, thickness)
@@ -47,7 +50,7 @@ def draw_label(img, text, pos, color, font_scale=0.5, thickness=1):
     cv2.putText(img, text, (x, y_text - 2), font, font_scale, text_color, thickness, cv2.LINE_AA)
 
 
-def draw_rounded_rectangle(img, pt1, pt2, color, thickness=2, r=10):
+def draw_rounded_rectangle(img: np.ndarray, pt1: Tuple[int, int], pt2: Tuple[int, int], color: Tuple[int, int, int], thickness: int = 2, r: int = 10):
     x1, y1 = pt1
     x2, y2 = pt2
 

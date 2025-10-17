@@ -10,6 +10,7 @@ from aioz_ainode_base.trainer.exception import AINodeTrainerException
 from aioz_ainode_base.trainer.schemas import IOExample, IOMetadata, TrainerInput, TrainerOutput
 
 from .draw import draw_label, draw_rounded_rectangle, draw_transparent_box, get_label_colors
+from .enums import Tasks
 from .models.builder import build_model
 from .utils.dataset_loader import get_dataloader
 from .utils.metrics import get_criterion, get_optimizer, get_scheduler
@@ -106,8 +107,10 @@ def run(input_obj: Union[dict, TrainerInput] = None) -> TrainerOutput:
         raise AINodeTrainerException()
 
 
-def inference(task_type, config, output_dir, weight_path, device):
+def inference(task_type: str, config: dict, output_dir: str, weight_path: str, device: str):
     os.makedirs(output_dir, exist_ok=True)
+
+    config["model"]["pretrained"] = ""
     model = build_model(task_type, config["model"], device)
     model.load_state_dict(torch.load(weight_path, map_location=device))
     model.eval()
@@ -115,7 +118,7 @@ def inference(task_type, config, output_dir, weight_path, device):
     _, val_loader, dataset = get_dataloader(task_type, config["dataset"])
     idx_to_class = {v: k for k, v in dataset.class_to_idx.items()}
     results = []
-    if task_type == "detection":
+    if task_type == Tasks.DETECTION.value:
         colors = get_label_colors(dataset.class_to_idx)
         with torch.no_grad():
             for idx, (imgs, _, img_paths) in enumerate(val_loader):
@@ -146,7 +149,7 @@ def inference(task_type, config, output_dir, weight_path, device):
 
                 results.append((save_path, class_name))
 
-    elif task_type == "classification":
+    elif task_type == Tasks.CLASSIFICATION.value:
         with torch.no_grad():
             for _, (imgs, _, img_paths) in enumerate(val_loader):
                 input = imgs.to(device)
